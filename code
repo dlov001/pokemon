@@ -1,0 +1,428 @@
+# data analysis and wrangling
+import pandas as pd
+import numpy as np
+import random as rnd
+
+# visualization
+import seaborn as sb
+import matplotlib.pyplot as plt
+import missingno
+
+# machine learning
+from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.metrics import accuracy_score
+from sklearn.preprocessing import StandardScaler, MinMaxScaler, OneHotEncoder, LabelEncoder
+from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC, LinearSVC
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.naive_bayes import GaussianNB
+from sklearn.linear_model import Perceptron
+from sklearn.linear_model import SGDClassifier
+from sklearn.tree import DecisionTreeClassifier
+
+df = pd.read_csv('~/Desktop/ML/pokemon.csv')
+df.head()
+df.info()
+
+for i in df.columns:
+    if df[i].isna().sum() != 0:
+        print(f'Column {i} is missing {df[i].isna().sum() } values.')
+    else:
+        pass
+    
+# only 4 columns with missing values (height_m, percentage_male, type2, weight_kg)
+
+'''Goal: Predict legendary pokemons'''
+
+'''Data Wrangling'''
+
+# Merge types together to get rid of nans
+
+types = []
+
+for i in range(len(df)):
+    if pd.isna(df['type2'][i]) == True:
+        types.append(df['type1'][i])
+    else:
+        types.append(df['type1'][i] + '/' + df['type2'][i])
+        
+df['types'] = types
+
+df = df.drop(['type1','type2'],axis=1)
+
+sb.histplot(df['height_m'])
+plt.show()
+
+np.where(pd.isna(df['height_m']))
+
+sb.histplot(df['percentage_male'])
+plt.show()
+
+sb.histplot(df['weight_kg'])
+plt.show()
+
+# see that of the missing values, they are all skewed to the right, so impute with median values
+
+df['height_m'].fillna(df['height_m'].median(),inplace=True)
+df['percentage_male'].fillna(df['percentage_male'].mode()[0],inplace=True)
+df['weight_kg'].fillna(df['weight_kg'].median(),inplace=True)
+
+df.info()
+
+# now no missing values, time to look through the data and select what is important and not
+
+'''Data Exploration'''
+
+def cross(df, response, variable):
+    crosstabs = pd.crosstab(index = df[variable], columns = df[response])
+    print(crosstabs)
+    crosstabs.plot.bar()
+    plt.show()
+
+df.info()
+df.columns
+
+cross(df,'is_legendary','generation')
+
+plt.hist(df['experience_growth'],bins=4)
+plt.show()
+
+'''Create bins for the numeric values to better categorize them'''
+
+df['exp'] = pd.cut(df['experience_growth'],bins =3)
+df['exp']
+df[['exp','is_legendary']].groupby(['exp'], as_index=False).mean().sort_values(by='exp',ascending=False)
+
+exp_rate = []
+
+for i in range(len(df)):
+    if df['experience_growth'][i] <= 946666.667:
+        exp_rate.append('slow')
+    elif df['experience_growth'][i] > 946666.667 and df['experience_growth'][i] <= 1293333.333:
+        exp_rate.append('middle')
+    else:
+        exp_rate.append('fast')
+        
+df['exp_rate'] = exp_rate
+
+df = df.drop(['experience_growth','exp'],axis=1)
+df.head()
+df.info()
+
+bin_list = ['attack',
+       'base_egg_steps', 'base_happiness', 'base_total',
+       'defense', 'height_m', 'hp', 'sp_attack', 'sp_defense', 'speed', 'weight_kg']
+
+for i in bin_list:
+    df['bin_' + i] = pd.cut(df[i],bins = 3)
+    
+df[bin_list]
+
+for i in bin_list:
+    df[['bin_' + i,'is_legendary']].groupby(['bin_' + i], as_index=False).mean().sort_values(by='bin_' + i,ascending=True)
+    '-' *40
+    
+df.info()
+
+'''---------------------------------------------------------------------------------------------------------------------------'''
+
+attack_stat = []
+
+for i in range(len(df)):
+    if df['attack'][i] <= 65.0:
+        attack_stat.append('Low')
+    elif (df['attack'][i] > 65.0) and (df['attack'][i]) <= 125.0:
+        attack_stat.append('Middle')
+    else:
+        attack_stat.append('high')
+        
+df['attack'] = attack_stat
+
+'''---------------------------------------------------------------------------------------------------------------------------'''
+
+egg = []
+
+for i in range(len(df)):
+    if df['base_egg_steps'][i] <= 11093.333:
+        egg.append('Low')
+    elif (df['base_egg_steps'][i] > 11093.333) and (df['base_egg_steps'][i]) <= 20906.667:
+        egg.append('Middle')
+    else:
+        egg.append('high')
+        
+df['egg'] = egg
+        
+'''---------------------------------------------------------------------------------------------------------------------------'''
+
+happiness = []
+
+for i in range(len(df)):
+    if df['base_happiness'][i] <= 46.667:
+        happiness.append('Low')
+    elif (df['base_happiness'][i] > 46.667) and (df['base_happiness'][i]) <= 93.333:
+        happiness.append('Middle')
+    else:
+        happiness.append('high')
+
+df['happy'] = happiness
+
+'''---------------------------------------------------------------------------------------------------------------------------'''
+
+stat_total = []
+
+for i in range(len(df)):
+    if df['base_total'][i] <= 380.0:
+        stat_total.append('Low')
+    elif (df['base_total'][i] > 380.0) and (df['base_total'][i]) <= 580.0:
+        stat_total.append('Middle')
+    else:
+        stat_total.append('high')
+        
+df['stat_total'] = stat_total
+        
+'''---------------------------------------------------------------------------------------------------------------------------'''
+
+defense = []
+
+for i in range(len(df)):
+    if df['defense'][i] <= 80.0:
+        defense.append('Low')
+    elif (df['defense'][i] > 80.0) and (df['defense'][i]) <= 155.0:
+        defense.append('Middle')
+    else:
+        defense.append('high')
+        
+df['def'] = defense
+        
+'''---------------------------------------------------------------------------------------------------------------------------'''
+
+hp = []
+
+for i in range(len(df)):
+    if df['hp'][i] <= 85.667:
+        hp.append('Low')
+    elif (df['hp'][i] > 85.667) and (df['hp'][i]) <= 170.333:
+        hp.append('Middle')
+    else:
+        hp.append('high')
+        
+df['hp'] = hp       
+        
+'''---------------------------------------------------------------------------------------------------------------------------'''
+
+height = []
+
+for i in range(len(df)):
+    if df['height_m'][i] <= 4.9:
+        height.append('Small')
+    elif (df['height_m'][i] > 4.9) and (df['height_m'][i]) <= 9.7:
+        height.append('Middle')
+    else:
+        height.append('Tall')
+        
+df['height'] = height        
+        
+'''---------------------------------------------------------------------------------------------------------------------------'''
+
+sp_attack = []
+
+for i in range(len(df)):
+    if df['sp_attack'][i] <= 71.333:
+        sp_attack.append('Low')
+    elif (df['sp_attack'][i] > 71.333) and (df['sp_attack'][i]) <= 132.667:
+        sp_attack.append('Middle')
+    else:
+        sp_attack.append('high')
+        
+df['sp_attack'] = sp_attack        
+        
+'''---------------------------------------------------------------------------------------------------------------------------'''
+
+sp_def = []
+
+for i in range(len(df)):
+    if df['sp_defense'][i] <= 65.0:
+        sp_def.append('Low')
+    elif (df['sp_defense'][i] > 65.0) and (df['sp_defense'][i]) <= 125.0:
+        sp_def.append('Middle')
+    else:
+        sp_def.append('high')
+        
+df['sp_def'] = sp_def
+
+'''---------------------------------------------------------------------------------------------------------------------------'''
+
+speed = []
+        
+for i in range(len(df)):
+    if df['speed'][i] <= 90.0:
+        speed.append('Slow')
+    elif (df['speed'][i] > 90.0) and (df['speed'][i]) <= 160.0:
+        speed.append('Middle')
+    else:
+        speed.append('Fast')
+        
+
+df['speed'] = speed
+
+'''---------------------------------------------------------------------------------------------------------------------------'''
+
+weight = []
+
+for i in range(len(df)):
+    if df['weight_kg'][i] <= 333.367:
+        weight.append('Light')
+    elif (df['weight_kg'][i] > 333.367) and (df['weight_kg'][i]) <= 666.633:
+        weight.append('Middle')
+    else:
+        weight.append('heavy')
+        
+df['weight'] = weight
+        
+'''---------------------------------------------------------------------------------------------------------------------------'''
+df = df.drop(df.columns[40:51],axis=1)
+
+df = df.drop(df.columns[20:30],axis=1)
+df = df.drop(df.columns[21],axis=1)
+df = df.drop(['sp_defense','generation','weight_kg'],axis=1)
+df.info()
+
+df.head()
+
+g = sb.FacetGrid(df, col = 'is_legendary')
+g.map(plt.hist, 'egg', bins = 10)
+plt.show()
+
+cross(df,'is_legendary','attack')
+
+
+'''Create training and testing datasets (predict gen 7 pokemon if they are legendary or not)'''
+df = df.drop('abilities',axis=1)
+df = pd.get_dummies(df)
+train_df = df[0:649]
+train_df.shape
+
+test_df = df[649:]
+test_df.shape
+
+train_df.head()
+
+x_train = train_df.drop('is_legendary',axis=1)
+y_train = train_df['is_legendary']
+x_test = test_df.drop('is_legendary',axis=1).copy()
+
+x = df.drop('is_legendary',axis=1)
+y = df['is_legendary']
+x_train,x_test,y_train,y_test = train_test_split(x,y,test_size=0.4, random_state=42)
+
+'''---------------------------------------------------------------------------------------------------------------------------'''
+
+log_reg = LogisticRegression()
+
+log_reg.fit(x_train, y_train)
+
+y_pred = log_reg.predict(x_test)
+
+acc_log = round(log_reg.score(x_train, y_train) * 100, 2)
+acc_log
+
+coeff_df = pd.DataFrame(train_df.columns.delete(0)) #without delete(0), Survived is part of the dataframe
+coeff_df.columns = ['Feature']
+
+coeff_df['Correlation'] = pd.Series(log_reg.coef_[0])
+coeff_df.sort_values(by='Correlation', ascending=False)
+
+
+'''Support Vector Machines'''
+
+svc = SVC()
+
+svc.fit(x_train,y_train)
+
+y_pred = svc.predict(x_test)
+
+acc_svc = round(svc.score(x_train, y_train) * 100,2)
+acc_svc
+
+'''K Nearest Neighbors'''
+
+knn = KNeighborsClassifier(n_neighbors= 3)
+
+knn.fit(x_train, y_train)
+y_pred = knn.predict(x_test)
+
+acc_knn = round(knn.score(x_train, y_train) * 100, 2)
+acc_knn
+
+'''Gaussian Naive Bayes'''
+
+gaussian = GaussianNB()
+gaussian.fit(x_train, y_train)
+Y_pred = gaussian.predict(x_test)
+acc_gaussian = round(gaussian.score(x_train, y_train) * 100, 2)
+acc_gaussian
+
+'''Perceptron'''
+
+perceptron = Perceptron()
+perceptron.fit(x_train, y_train)
+Y_pred = perceptron.predict(x_test)
+acc_perceptron = round(perceptron.score(x_train, y_train) * 100, 2)
+acc_perceptron
+
+
+'''Linear SVC'''
+
+linear_svc = LinearSVC()
+linear_svc.fit(x_train, y_train)
+Y_pred = linear_svc.predict(x_test)
+acc_linear_svc = round(linear_svc.score(x_train, y_train) * 100, 2)
+acc_linear_svc
+
+'''Stochastic Gradient Descent'''
+
+sgd = SGDClassifier()
+sgd.fit(x_train, y_train)
+Y_pred = sgd.predict(x_test)
+acc_sgd = round(sgd.score(x_train, y_train) * 100, 2)
+
+acc_sgd
+
+'''Decision Tree'''
+
+decision_tree = DecisionTreeClassifier()
+decision_tree.fit(x_train, y_train)
+Y_pred = decision_tree.predict(x_test)
+acc_decision_tree = round(decision_tree.score(x_train, y_train) * 100, 2)
+acc_decision_tree
+
+'''Random Forest'''
+
+random_forest = RandomForestClassifier(n_estimators=100)
+random_forest.fit(x_train, y_train)
+Y_pred = random_forest.predict(x_test)
+random_forest.score(x_train, y_train)
+acc_random_forest = round(random_forest.score(x_train, y_train) * 100, 2)
+acc_random_forest
+
+
+'''Model Evaluation'''
+
+models = pd.DataFrame({
+    'Model': ['Support Vector Machines', 'KNN', 'Logistic Regression', 
+              'Random Forest', 'Naive Bayes', 'Perceptron', 
+              'Stochastic Gradient Decent', 'Linear SVC', 
+              'Decision Tree'],
+    'Score': [acc_svc, acc_knn, acc_log, 
+              acc_random_forest, acc_gaussian, acc_perceptron, 
+              acc_sgd, acc_linear_svc, acc_decision_tree]})
+sorted_model=models.sort_values(by='Score', ascending=False)
+sorted_model
+
+plt.figure(figsize=(20,10))
+fig = plt.bar(sorted_model['Model'], sorted_model['Score'],color='blue')
+plt.grid()
+plt.show()
